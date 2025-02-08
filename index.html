@@ -1,223 +1,455 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DeepSeek-R1 Chat</title>
-  <link rel="icon" href="data:," type="image/x-icon">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>DeepSeek-R1</title>
   <!-- Bootstrap 5 CSS -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <!-- Bootstrap Icons -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
-  
+  <!-- MathJax zur korrekten Darstellung von LaTeX -->
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
   <style>
-    body {
-      background-color: #f8f9fa;
-      transition: background-color 0.3s ease;
+    /* Farbvariablen */
+    :root {
+      --bg-body: #343541;
+      --bg-sidebar: #202123;
+      --bg-panel: #3f3f4b;
+      --bg-chat: #2e2f37;
+      --primary-blue: #007bff;
+      --text-light: #ececf1;
+      --text-grey: #bbb;
+      --border-faint: rgba(255,255,255,0.1);
     }
-    /* Navbar */
-    .navbar {
-      margin-bottom: 20px;
+    body.light-mode {
+      --bg-body: #fdfdfd;
+      --bg-sidebar: #f5f5f5;
+      --bg-panel: #e9ecef;
+      --bg-chat: #ffffff;
+      --text-light: #212529;
+      --primary-blue: #1976d2;
+      --text-grey: #555;
     }
-    /* Dark Mode für Navbar */
-    .dark-mode .navbar {
-      background-color: #343a40 !important;
+    
+    /* BASISLAYOUT */
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body {
+      height: 100%;
+      background-color: var(--bg-body);
+      color: var(--text-light);
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      overflow-x: hidden;
+      transition: background-color 0.2s;
     }
-    .dark-mode .navbar .navbar-brand,
-    .dark-mode .navbar .nav-link {
-      color: #ffffff !important;
-    }
-    /* Modal (Einstellungen) im Dark Mode */
-    .dark-mode .modal-content {
-      background-color: #343a40;
-      color: #ffffff;
-    }
-    .dark-mode .modal-header .modal-title,
-    .dark-mode .modal-body,
-    .dark-mode .modal-footer {
-      color: #ffffff;
-    }
-    /* Chat-Container */
-    .chat-container {
-      max-width: 600px;
-      margin: 0 auto 20px auto;
-      background: white;
-      padding: 20px;
-      border-radius: 10px;
-      box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
-    }
-    .greeting {
-      font-size: 1.2rem;
-      margin-bottom: 10px;
-      text-align: center;
-      font-weight: 500;
-    }
-    .chat-history {
-      max-height: 400px;
-      overflow-y: auto;
-      padding: 10px;
-      border-radius: 10px;
-      background: #e9ecef;
+    body { display: flex; }
+    
+    /* SIDEBAR – 260px breit, dezente Scrollbar, Steuerung über flex-basis */
+    .sidebar {
+      flex: 0 0 260px;
+      height: 100vh;
+      background-color: var(--bg-sidebar);
       display: flex;
       flex-direction: column;
+      border-right: 1px solid var(--border-faint);
+      padding: 0.5rem;
+      transition: flex-basis 0.3s;
+      overflow-y: auto;
     }
-    /* Container für einzelne Nachrichten */
+    .sidebar::-webkit-scrollbar {
+      width: 6px;
+    }
+    .sidebar::-webkit-scrollbar-track {
+      background: var(--bg-sidebar);
+    }
+    .sidebar::-webkit-scrollbar-thumb {
+      background: #555;
+      border-radius: 3px;
+    }
+    .sidebar.collapsed {
+      flex: 0 0 80px !important;
+    }
+    /* Im collapsed-Zustand: Blende Texte in Menü-Elementen und Chat-Sessions aus */
+    .sidebar.collapsed span,
+    .sidebar.collapsed .sidebar-title,
+    .sidebar.collapsed .model-selection,
+    .sidebar.collapsed .chat-session-item span {
+      display: none !important;
+    }
+    .sidebar.collapsed .menu-item,
+    .sidebar.collapsed .profile-link,
+    .sidebar.collapsed .chat-session-item {
+      justify-content: center;
+    }
+    
+    /* Gruppierung in der Sidebar */
+    .upper-menu, .chat-menu, .lower-menu { margin-bottom: 0.5rem; }
+    .sidebar-title {
+      font-size: 1.3rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+    .model-selection { margin-bottom: 1rem; }
+    .model-selection label { font-size: 0.9rem; margin-right: 0.5rem; }
+    .model-selection select {
+      border: none;
+      border-radius: 4px;
+      padding: 0.3rem 0.5rem;
+      font-size: 0.9rem;
+      background-color: var(--bg-chat);
+      color: var(--text-light);
+    }
+    body.light-mode .model-selection select {
+      background-color: #fff;
+      color: var(--text-light);
+    }
+    
+    /* Standard-Menüpunkte */
+    .menu-item, .profile-link {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      cursor: pointer;
+      color: var(--text-grey);
+      padding: 0.5rem 0.75rem;
+      border-radius: 5px;
+      transition: background-color 0.2s, transform 0.2s;
+    }
+    .menu-item:hover, .profile-link:hover {
+      background-color: #2b2c2f;
+      color: #fff;
+      transform: scale(1.02);
+    }
+    .menu-item i, .profile-link i { font-size: 1.2rem; }
+    
+    /* Chat-Sessions in der Sidebar – nur tatsächliche Chats des Nutzers */
+    .chat-menu { margin-top: 0.5rem; }
+    .chat-sessions { }
+    .chat-session-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      padding: 0.3rem 0.5rem;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      margin-bottom: 0.25rem;
+    }
+    .chat-session-item:hover { background-color: #2b2c2f; }
+    /* Dummy-Bilder für das Chat-Icon */
+    .chat-session-item img.chat-session-icon {
+      width: 20px;
+      height: 20px;
+      margin-right: 4px;
+    }
+    .chat-session-item span { font-size: 0.9rem; }
+    .menu-item.new-chat { color: var(--primary-blue); }
+    
+    /* Toggle-Button – absolut oben rechts in der Sidebar */
+    .sidebar-toggle {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      cursor: pointer;
+      color: var(--text-grey);
+      background-color: var(--bg-sidebar);
+      padding: 0.3rem;
+      border-radius: 4px;
+      transition: color 0.2s;
+    }
+    .sidebar-toggle:hover { color: var(--text-light); }
+    
+    .lower-menu { display: flex; align-items: center; justify-content: space-between; }
+    
+    /* MAIN-BEREICH */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .chat-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 2rem 1rem;
+      overflow-y: auto;
+    }
+    /* Chat-Panel – absolut zentriert */
+    .chat-panel {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      max-width: 750px;
+      background-color: var(--bg-panel);
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      padding: 1rem;
+      transition: background-color 0.2s;
+      overflow: hidden;
+    }
+    .chat-title {
+      position: relative;
+      text-align: center;
+      font-size: 1.4rem;
+      font-weight: 500;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border-faint);
+      margin-bottom: 0.5rem;
+    }
+    .chat-title i.bi-trash {
+      position: absolute;
+      right: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      cursor: pointer;
+      font-size: 1.2rem;
+      color: var(--text-grey);
+      transition: color 0.2s;
+    }
+    .chat-title i.bi-trash:hover { color: red; }
+    
+    .chat-history {
+      flex: 1;
+      background-color: var(--bg-chat);
+      border-radius: 8px;
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      overflow-y: auto;
+      transition: background-color 0.2s;
+    }
+    
     .message-wrapper {
       display: flex;
-      margin-bottom: 10px;
+      align-items: flex-start;
+      gap: 8px;
+      animation: fadeIn 0.3s ease-out;
     }
+    .message-wrapper.user-message { justify-content: flex-end; }
+    .message-wrapper.bot-message { justify-content: flex-start; }
+    
     .message-avatar {
       width: 40px;
       height: 40px;
       border-radius: 50%;
-      margin-right: 10px;
+      flex-shrink: 0;
     }
     .message-content {
-      background: #f1f1f1;
-      border-radius: 10px;
-      padding: 10px 15px;
-      position: relative;
+      background-color: #6c757d;
+      border-radius: 8px;
+      padding: 0.5rem 0.8rem;
+      color: #fff;
       max-width: 80%;
-      animation: fadeIn 0.2s ease-in-out;
+      line-height: 1.4;
+      word-wrap: break-word;
+      transition: background-color 0.2s;
     }
-    /* Benutzer- und Bot-Nachrichten */
     .user-message .message-content {
-      background: #007bff;
-      color: white;
-      border-top-right-radius: 0;
+      background-color: var(--primary-blue);
+      border-top-right-radius: 0 !important;
+      border-bottom-right-radius: 8px;
     }
     .bot-message .message-content {
-      background: #6c757d;
-      color: white;
-      border-top-left-radius: 0;
+      background-color: #6c757d;
+      border-top-left-radius: 0 !important;
+      border-bottom-left-radius: 8px;
     }
-    /* Zeitstempel – besser sichtbar */
+    body.light-mode .bot-message .message-content {
+      background-color: #e2e3e5;
+      color: var(--text-light);
+    }
+    /* Falls im Bot-Text "Gedankengänge" (Chain-of-Thought) vorhanden sind, 
+       können diese in einem separaten Block angezeigt werden */
+    .chain-of-thought {
+      font-size: 0.85rem;
+      color: var(--text-grey);
+      border-left: 2px dashed var(--text-grey);
+      padding-left: 0.5rem;
+      margin-top: 0.5rem;
+      display: none; /* zunächst ausgeblendet */
+    }
+    .toggle-chain {
+      background: none;
+      border: none;
+      color: var(--primary-blue);
+      font-size: 0.85rem;
+      cursor: pointer;
+      padding: 0;
+      margin-bottom: 0.5rem;
+    }
     .timestamp {
-      font-size: 0.75rem;
-      color: #555;
+      font-size: 0.65rem;
+      opacity: 0.8;
       margin-top: 3px;
       text-align: right;
     }
-    .dark-mode .timestamp {
-      color: #bbb;
-    }
-    /* Animation */
     @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    /* Dark Mode allgemeine Styles */
-    .dark-mode {
-      background-color: #212529;
-      color: white;
+    
+    .chat-input-bar {
+      display: flex;
+      align-items: center;
+      background-color: var(--bg-chat);
+      border-radius: 8px;
+      padding: 0.6rem;
+      gap: 0.6rem;
+      transition: background-color 0.2s;
     }
-    .dark-mode .chat-container {
-      background: #343a40;
-      color: white;
-    }
-    .dark-mode .chat-history {
-      background: #495057;
-    }
-    .dark-mode .message-content {
-      background: #6c757d;
-      color: white;
-    }
-    /* Textbox */
     #userInput {
-      border: 1px solid #ced4da;
-      border-radius: 25px;
-      padding: 10px 15px;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-    #userInput:focus {
+      flex: 1;
+      background-color: #1C1C1E;
+      border: none;
+      border-radius: 20px;
+      padding: 0.5rem 1rem;
+      color: #ddd;
+      font-size: 1rem;
       outline: none;
-      border-color: #80bdff;
-      box-shadow: 0 0 5px rgba(0, 123, 255, 0.5);
     }
-    /* Fehleranzeige */
-    #errorDisplay {
-      margin-bottom: 10px;
+    #userInput::placeholder { color: #666; }
+    body.light-mode #userInput {
+      background-color: #fff;
+      color: var(--text-light);
+    }
+    body.light-mode #userInput::placeholder { color: #666; }
+    
+    .chat-icons {
+      display: flex;
+      align-items: center;
+      gap: 0.8rem;
+    }
+    .chat-icons i {
+      font-size: 1.2rem;
+      color: #aaa;
+      cursor: pointer;
+      transition: color 0.2s;
+    }
+    .chat-icons i:hover { color: #fff; }
+    .send-btn {
+      background-color: var(--primary-blue);
+      border: none;
+      border-radius: 50%;
+      width: 44px;
+      height: 44px;
+      color: #fff;
+      font-size: 1.2rem;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .send-btn:hover { background-color: #0d6efd; }
+    
+    /* MODAL */
+    .modal-content {
+      background-color: var(--bg-panel);
+      color: var(--text-light);
+      border: none;
+    }
+    body.light-mode .modal-content {
+      background-color: #fff;
+      color: #000;
+    }
+    
+    @media (max-width: 768px) {
+      .sidebar {
+        position: fixed;
+        z-index: 1000;
+        height: 100vh;
+      }
+      .sidebar:not(.collapsed) ~ .main {
+        margin-left: 260px;
+      }
+      .sidebar.collapsed ~ .main {
+        margin-left: 80px;
+      }
     }
   </style>
-  
-  <!-- Marked.js für Markdown -->
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
-  <!-- MathJax für Mathe -->
-  <script type="text/javascript" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
-  
-  <script>
-    // Wandelt Text in eckigen Klammern in MathJax-kompatible Delimiter um.
-    function transformMath(text) {
-      return text.replace(/\[([\s\S]*?)\]/g, function(match, p1) {
-        return "\\[" + p1.trim() + "\\]";
-      });
-    }
-    
-    // Übersetzungsfunktion: Deutsch → Englisch
-    async function translateToEnglish(text) {
-      const response = await fetch("https://libretranslate.de/translate", {
-        method: "POST",
-        body: JSON.stringify({
-          q: text,
-          source: "de",
-          target: "en",
-          format: "text"
-        }),
-        headers: { "Content-Type": "application/json" }
-      });
-      const data = await response.json();
-      return data.translatedText;
-    }
-    
-    // Übersetzungsfunktion: Englisch → Deutsch
-    async function translateToGerman(text) {
-      const response = await fetch("https://libretranslate.de/translate", {
-        method: "POST",
-        body: JSON.stringify({
-          q: text,
-          source: "en",
-          target: "de",
-          format: "text"
-        }),
-        headers: { "Content-Type": "application/json" }
-      });
-      const data = await response.json();
-      return data.translatedText;
-    }
-  </script>
 </head>
 <body>
-  <!-- Navbar mit Dark Mode & Einstellungen -->
-  <nav class="navbar navbar-expand-lg navbar-light bg-light">
-    <div class="container">
-      <a class="navbar-brand" href="#">DeepSeek-R1 Chatbot</a>
-      <div class="ms-auto">
-        <button id="darkModeBtn" class="btn btn-sm btn-outline-secondary me-2" onclick="toggleDarkMode()">
-          <i class="bi bi-moon"></i> / <i class="bi bi-sun"></i>
-        </button>
-        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#settingsModal">
-          <i class="bi bi-gear"></i> Einstellungen
-        </button>
+  <!-- SIDEBAR -->
+  <div class="sidebar" id="sidebar">
+    <!-- Toggle-Button oben rechts -->
+    <div class="sidebar-toggle" onclick="toggleSidebar()">
+      <i class="bi bi-chevron-left" id="sidebarToggleIcon"></i>
+    </div>
+    <div class="upper-menu">
+      <div class="sidebar-title">DeepSeek-R1</div>
+      <div class="model-selection">
+        <label for="modelSelectSidebar">Modell:</label>
+        <select id="modelSelectSidebar">
+          <option value="deepseek-r1">deepseek-r1</option>
+          <option value="deepseek-r1:14b">deepseek-r1:14b</option>
+        </select>
+      </div>
+      <div class="menu-item" onclick="openHome()">
+        <i class="bi bi-house-door"></i><span>Start</span>
+      </div>
+      <div class="menu-item" onclick="openSettings()">
+        <i class="bi bi-gear"></i><span>Einstellungen</span>
+      </div>
+      <div class="menu-item" onclick="toggleTheme()">
+        <i class="bi bi-brightness-high"></i><span>Theme wechseln</span>
       </div>
     </div>
-  </nav>
-  
-  <div class="container chat-container">
-    <!-- Personalisierte Begrüßung -->
-    <div id="greeting" class="greeting"></div>
-    
-    <!-- Fehleranzeige -->
-    <div id="errorDisplay" class="alert alert-danger d-none" role="alert"></div>
-    
-    <div id="chatHistory" class="chat-history"></div>
-    
-    <div class="input-group mt-3">
-      <input type="text" id="userInput" class="form-control" placeholder="Nachricht eingeben...">
-      <button class="btn btn-primary" onclick="sendMessage()">Senden</button>
+    <hr class="section-divider">
+    <!-- Chat-Sessions (nur tatsächliche Chats des Nutzers, Gruppierung erfolgt in renderChatSessionsSidebar) -->
+    <div class="chat-menu">
+      <div class="chat-sessions" id="chatSessionsList">
+        <div class="chat-session-item" onclick="newChat()">
+          <img src="https://dummyimage.com/20x20/cccccc/000000.png&text=C" alt="Chat Icon" class="chat-session-icon">
+          <span>Neuer Chat</span>
+        </div>
+        <!-- Gespeicherte Chats werden hier gruppiert angezeigt -->
+      </div>
+    </div>
+    <div class="lower-menu">
+      <div class="profile-link" onclick="console.log('Profil clicked')">
+        <i class="bi bi-person"></i><span>Profil</span>
+      </div>
     </div>
   </div>
-  
-  <!-- Einstellungen Modal -->
+
+  <!-- MAIN-BEREICH -->
+  <div class="main" id="mainContent">
+    <div class="chat-container">
+      <div class="chat-panel" id="chatPanel">
+        <div class="chat-title">
+          <span id="chatTitle">Willkommen zu DeepSeek-R1</span>
+          <i class="bi bi-trash" title="Chat leeren" onclick="clearCurrentChatSession()"></i>
+        </div>
+        <div class="chat-history" id="chatHistory" role="log" aria-live="polite">
+          <div id="homeContent">
+            <p>Dies ist der Home-Bereich. Klicke auf "Start", um diese Ansicht erneut anzuzeigen.</p>
+          </div>
+        </div>
+        <div class="chat-input-bar" id="chatInputBar" style="display: none;">
+          <div class="chat-icons">
+            <i class="bi bi-mic" title="Spracheingabe" onclick="toggleVoiceRecognition()" id="micIcon"></i>
+            <i class="bi bi-gear" title="Einstellungen" onclick="openSettings()"></i>
+            <i class="bi bi-search" title="Suche" onclick="searchChat()"></i>
+          </div>
+          <input type="text" id="userInput" placeholder="Nachricht eingeben..." aria-label="Chat-Eingabe">
+          <button class="send-btn" onclick="sendMessage()">
+            <i class="bi bi-send-fill"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: Einstellungen -->
   <div class="modal fade" id="settingsModal" tabindex="-1" aria-labelledby="settingsModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -226,355 +458,565 @@
           <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Schließen"></button>
         </div>
         <div class="modal-body">
-          <!-- Benutzername -->
-          <div class="mb-3">
-            <label for="userNameInput" class="form-label">Benutzername</label>
-            <input type="text" class="form-control" id="userNameInput" placeholder="Gib deinen Namen ein">
-          </div>
-          <!-- Kontextmodus -->
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="contextToggle">
-            <label class="form-check-label" for="contextToggle">
-              Kontext aus vorherigen Nachrichten einbeziehen
-            </label>
-          </div>
-          <!-- Option: Antwort in Englisch erhalten und übersetzen -->
-          <div class="form-check mb-3">
-            <input class="form-check-input" type="checkbox" id="englishAnswerToggle">
-            <label class="form-check-label" for="englishAnswerToggle">
-              Antwort in Englisch erhalten (und dann übersetzen)
-            </label>
-          </div>
-          <!-- Chatverlauf löschen -->
-          <div class="mb-3">
-            <button class="btn btn-danger w-100" onclick="confirmClearChat()">
-              <i class="bi bi-trash"></i> Chatverlauf löschen
-            </button>
-          </div>
-          <div class="alert alert-info" role="alert">
-            Hinweis: Alle Daten werden lokal im Browser gespeichert. Für den produktiven Einsatz sollten zusätzliche Sicherheitsmaßnahmen (HTTPS, serverseitige Speicherung, etc.) implementiert werden.
+          <p>Diese Einstellungen sind als Beispiel implementiert.</p>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="themeSwitch" onclick="toggleTheme()">
+            <label class="form-check-label" for="themeSwitch">Dark/Light Mode wechseln</label>
           </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Schließen</button>
-          <button type="button" class="btn btn-primary" onclick="saveSettings()">Einstellungen speichern</button>
         </div>
       </div>
     </div>
   </div>
-  
-  <!-- Bootstrap 5 JS Bundle (mit Popper) -->
+
+  <!-- Bootstrap Bundle -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  
   <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      document.getElementById("userInput").addEventListener("keypress", function (event) {
-        if (event.key === "Enter") {
-          event.preventDefault();
+    /* =====================================
+       GLOBALE VARS & INITIALISIERUNG
+    ===================================== */
+    let isRecording = false;
+    let recognition;
+    let currentChatSession = [];
+    let chatSessions = JSON.parse(localStorage.getItem("chatSessions")) || [];
+    let currentBotMessageId = null;
+
+    // Validierung des ausgewählten Modells
+    function getSelectedModel() {
+      const modelSelect = document.getElementById("modelSelectSidebar");
+      const selected = modelSelect ? modelSelect.value : "";
+      const allowedModels = ["deepseek-r1", "deepseek-r1:14b"];
+      if (!allowedModels.includes(selected)) {
+        console.warn("Ungültiges Modell ausgewählt: " + selected + ". Standardmodell wird verwendet.");
+        return "deepseek-r1";
+      }
+      return selected;
+    }
+
+    // Gruppierung nach Datumskategorie
+    function getDateCategory(timestamp) {
+      const d = new Date(timestamp);
+      if (isNaN(d.getTime())) return "Unbekannt";
+      const today = new Date();
+      const yesterday = new Date();
+      yesterday.setDate(today.getDate() - 1);
+      if (d.toDateString() === today.toDateString()) return "Heute";
+      if (d.toDateString() === yesterday.toDateString()) return "Gestern";
+      return "Früher";
+    }
+
+    // Formatierung des Timestamps für Nachrichten (HH:mm)
+    function formatMessageTimestamp(timestamp) {
+      const d = new Date(timestamp);
+      return d.toLocaleTimeString("de-DE", { hour: '2-digit', minute: '2-digit' });
+    }
+
+    // Extrahiere Gedankengänge aus dem Text (alles, was zwischen **…** oder <think>…</think> steht)
+    function extractChainOfThought(text) {
+      let chain = "";
+      let mainText = text.replace(/<think>[\s\S]*?<\/think>/gi, (match) => {
+        chain += match + " ";
+        return "";
+      });
+      mainText = mainText.replace(/\*\*([\s\S]*?)\*\*/g, (match, p1) => {
+        chain += p1 + " ";
+        return "";
+      });
+      return { mainText: mainText.trim(), chainText: chain.trim() };
+    }
+
+    // Hängt einen separaten Block für den Gedankengang an eine Nachricht an, inkl. Toggle-Button
+    function appendChainToMessage(message, chainText) {
+      let chainDiv = message.querySelector(".chain-of-thought");
+      if (!chainDiv) {
+        // Toggle-Button erstellen
+        let toggleBtn = document.createElement("button");
+        toggleBtn.textContent = "Gedankengänge anzeigen";
+        toggleBtn.classList.add("btn", "btn-link", "p-0", "m-0", "toggle-chain");
+        toggleBtn.onclick = function() {
+          if (chainDiv.style.display === "none" || chainDiv.style.display === "") {
+            chainDiv.style.display = "block";
+            toggleBtn.textContent = "Gedankengänge ausblenden";
+          } else {
+            chainDiv.style.display = "none";
+            toggleBtn.textContent = "Gedankengänge anzeigen";
+          }
+        };
+        message.querySelector(".message-content").appendChild(toggleBtn);
+        // Chain-of-Thought Block erstellen
+        chainDiv = document.createElement("div");
+        chainDiv.classList.add("chain-of-thought");
+        chainDiv.style.display = "none";
+        message.querySelector(".message-content").appendChild(chainDiv);
+      }
+      chainDiv.textContent = chainText;
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (localStorage.getItem("theme") === "light") {
+        document.body.classList.add("light-mode");
+      }
+      loadCurrentChatSession();
+      renderCurrentChatSession();
+      renderChatSessionsSidebar();
+      openHome();
+
+      const input = document.getElementById("userInput");
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
           sendMessage();
         }
       });
-      if (localStorage.getItem("darkMode") === "enabled") {
-        document.body.classList.add("dark-mode");
+
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = "de-DE";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          document.getElementById("userInput").value = transcript;
+          toggleVoiceRecognition();
+        };
+        recognition.onerror = (event) => {
+          console.error("Speech Recognition Error: ", event.error);
+          toggleVoiceRecognition();
+        };
+        recognition.onend = () => {
+          isRecording = false;
+          const micIcon = document.getElementById("micIcon");
+          if (micIcon) micIcon.style.color = "";
+        };
       }
-      loadChatHistory();
-      loadSettings();
-      displayGreeting();
     });
-    
-    // Einstellungen laden
-    function loadSettings() {
-      const userName = localStorage.getItem("userName") || "";
-      const contextEnabled = localStorage.getItem("contextEnabled") === "true";
-      const englishAnswer = localStorage.getItem("englishAnswer") === "true";
-      document.getElementById("userNameInput").value = userName;
-      document.getElementById("contextToggle").checked = contextEnabled;
-      document.getElementById("englishAnswerToggle").checked = englishAnswer;
+
+    /* =====================================
+       HOME & CHAT-ANSICHT
+    ===================================== */
+    function openHome() {
+      const chatTitle = document.getElementById("chatTitle");
+      if (chatTitle) chatTitle.textContent = "Willkommen zu DeepSeek-R1";
+      const homeContent = document.getElementById("homeContent");
+      if (homeContent) homeContent.style.display = "block";
+      const chatInputBar = document.getElementById("chatInputBar");
+      if (chatInputBar) chatInputBar.style.display = "none";
     }
-    
-    // Einstellungen speichern
-    function saveSettings() {
-      const userName = document.getElementById("userNameInput").value.trim();
-      const contextEnabled = document.getElementById("contextToggle").checked;
-      const englishAnswer = document.getElementById("englishAnswerToggle").checked;
-      localStorage.setItem("userName", userName);
-      localStorage.setItem("contextEnabled", contextEnabled);
-      localStorage.setItem("englishAnswer", englishAnswer);
-      displayGreeting();
-      const modalEl = document.getElementById('settingsModal');
-      const modal = bootstrap.Modal.getInstance(modalEl);
-      modal.hide();
+    function openChat() {
+      const chatTitle = document.getElementById("chatTitle");
+      if (chatTitle) chatTitle.textContent = "Chat";
+      const homeContent = document.getElementById("homeContent");
+      if (homeContent) homeContent.style.display = "none";
+      const chatInputBar = document.getElementById("chatInputBar");
+      if (chatInputBar) chatInputBar.style.display = "flex";
     }
-    
-    // Personalisierte Begrüßung
-    function displayGreeting() {
-      const userName = localStorage.getItem("userName");
-      const greetingEl = document.getElementById("greeting");
-      if (userName) {
-        greetingEl.innerText = "Willkommen, " + userName + "!";
+
+    /* =====================================
+       CHAT-SESSION & NACHRICHTEN
+    ===================================== */
+    function saveCurrentChatSession() {
+      localStorage.setItem("currentChatSession", JSON.stringify(currentChatSession));
+    }
+    function loadCurrentChatSession() {
+      currentChatSession = JSON.parse(localStorage.getItem("currentChatSession")) || [];
+    }
+    function renderCurrentChatSession() {
+      const chatHistory = document.getElementById("chatHistory");
+      if (!chatHistory) return;
+      chatHistory.innerHTML = "";
+      currentChatSession.forEach(msg => addMessageToUI(msg));
+    }
+    function addMessageToUI(msg) {
+      const chatHistory = document.getElementById("chatHistory");
+      if (!chatHistory) return;
+      const wrapper = document.createElement("div");
+      wrapper.classList.add("message-wrapper", msg.role);
+      const avatar = document.createElement("img");
+      avatar.classList.add("message-avatar");
+      // Verwende Dummy-Bilder für Avatare
+      avatar.src = (msg.role === "user-message") ?
+        "https://dummyimage.com/40x40/cccccc/000000.png&text=U" :
+        "https://dummyimage.com/40x40/cccccc/000000.png&text=B";
+      avatar.alt = (msg.role === "user-message") ? "User Avatar" : "Bot Avatar";
+      const content = document.createElement("div");
+      content.classList.add("message-content");
+      const textEl = document.createElement("span");
+      textEl.classList.add(msg.role === "bot-message" ? "bot-text" : "message-text");
+      textEl.textContent = msg.text;
+      content.appendChild(textEl);
+      const timeEl = document.createElement("div");
+      timeEl.classList.add("timestamp");
+      timeEl.textContent = formatMessageTimestamp(msg.timestamp);
+      content.appendChild(timeEl);
+      wrapper.appendChild(avatar);
+      wrapper.appendChild(content);
+      chatHistory.appendChild(wrapper);
+    }
+    // Fügt eine Nachricht hinzu – ohne Animationen
+    function addMessage(role, text, id) {
+      // Entferne unerwünschte Tags/Marker (auch gedankliche Markierungen)
+      let extracted = extractChainOfThought(text);
+      text = extracted.mainText;
+      let chain = extracted.chainText;
+      const timestamp = new Date().toISOString();
+      const msg = { role, text, timestamp };
+      if (!id) {
+        currentChatSession.push(msg);
+        saveCurrentChatSession();
+      }
+      const chatHistory = document.getElementById("chatHistory");
+      if (!chatHistory) return;
+      const wrapper = document.createElement("div");
+      if (id) wrapper.id = id;
+      wrapper.classList.add("message-wrapper", role);
+      const avatar = document.createElement("img");
+      avatar.classList.add("message-avatar");
+      avatar.src = (role === "user-message") ?
+        "https://dummyimage.com/40x40/cccccc/000000.png&text=U" :
+        "https://dummyimage.com/40x40/cccccc/000000.png&text=B";
+      avatar.alt = (role === "user-message") ? "User Avatar" : "Bot Avatar";
+      const content = document.createElement("div");
+      content.classList.add("message-content");
+      if (role === "bot-message") {
+        const textEl = document.createElement("span");
+        textEl.classList.add("bot-text");
+        textEl.textContent = text;
+        content.appendChild(textEl);
+        // Falls Gedankengänge vorhanden sind, füge einen Toggle-Block hinzu
+        if (chain) {
+          let toggleBtn = document.createElement("button");
+          toggleBtn.textContent = "Gedankengänge anzeigen";
+          toggleBtn.classList.add("btn", "btn-link", "p-0", "m-0", "toggle-chain");
+          toggleBtn.style.fontSize = "0.85rem";
+          toggleBtn.onclick = function() {
+            let chainDiv = content.querySelector(".chain-of-thought");
+            if (!chainDiv) return;
+            if (chainDiv.style.display === "none" || chainDiv.style.display === "") {
+              chainDiv.style.display = "block";
+              toggleBtn.textContent = "Gedankengänge ausblenden";
+            } else {
+              chainDiv.style.display = "none";
+              toggleBtn.textContent = "Gedankengänge anzeigen";
+            }
+          };
+          content.appendChild(toggleBtn);
+          let chainDiv = document.createElement("div");
+          chainDiv.classList.add("chain-of-thought");
+          chainDiv.style.display = "none";
+          chainDiv.textContent = chain;
+          content.appendChild(chainDiv);
+        }
       } else {
-        greetingEl.innerText = "";
+        const textEl = document.createElement("span");
+        textEl.classList.add("message-text");
+        textEl.textContent = text;
+        content.appendChild(textEl);
+      }
+      const timeEl = document.createElement("div");
+      timeEl.classList.add("timestamp");
+      timeEl.textContent = formatMessageTimestamp(timestamp);
+      content.appendChild(timeEl);
+      wrapper.appendChild(avatar);
+      wrapper.appendChild(content);
+      chatHistory.appendChild(wrapper);
+      chatHistory.scrollTop = chatHistory.scrollHeight;
+    }
+    function clearCurrentChatSession() {
+      currentChatSession = [];
+      saveCurrentChatSession();
+      const chatHistory = document.getElementById("chatHistory");
+      if (chatHistory) chatHistory.innerHTML = "";
+    }
+
+    /* =====================================
+       CHAT-SESSION VERWALTUNG & KATEGORIE
+    ===================================== */
+    function newChat() {
+      if (currentChatSession.length > 0) {
+        chatSessions.push([...currentChatSession]);
+        localStorage.setItem("chatSessions", JSON.stringify(chatSessions));
+      }
+      currentChatSession = [];
+      saveCurrentChatSession();
+      const chatHistory = document.getElementById("chatHistory");
+      if (chatHistory) chatHistory.innerHTML = "";
+      renderChatSessionsSidebar();
+      openChat();
+    }
+    function loadChatSession(index) {
+      currentChatSession = [...chatSessions[index]];
+      saveCurrentChatSession();
+      renderCurrentChatSession();
+      openChat();
+    }
+    function renderChatSessionsSidebar() {
+      const container = document.getElementById("chatSessionsList");
+      if (!container) return;
+      container.innerHTML = "";
+      // Neuer Chat-Eintrag
+      const newChatItem = document.createElement("div");
+      newChatItem.classList.add("chat-session-item");
+      newChatItem.onclick = newChat;
+      newChatItem.innerHTML = '<img src="https://dummyimage.com/20x20/cccccc/000000.png&text=C" alt="Chat Icon" class="chat-session-icon"><span>Neuer Chat</span>';
+      container.appendChild(newChatItem);
+      // Gruppiere gespeicherte Chats nach Datum
+      const groups = {};
+      chatSessions.forEach((session, index) => {
+        if (session.length > 0) {
+          const category = getDateCategory(session[0]?.timestamp);
+          if (!groups[category]) { groups[category] = []; }
+          groups[category].push({ session, index });
+        }
+      });
+      const categoryOrder = ["Heute", "Gestern", "Früher", "Unbekannt"];
+      categoryOrder.forEach(cat => {
+        if (groups[cat]) {
+          const header = document.createElement("h6");
+          header.textContent = cat;
+          header.className = "project-section";
+          container.appendChild(header);
+          groups[cat].forEach(item => {
+            const sessionItem = document.createElement("div");
+            sessionItem.classList.add("chat-session-item");
+            sessionItem.onclick = () => loadChatSession(item.index);
+            const sidebar = document.getElementById("sidebar");
+            const trashIcon = sidebar.classList.contains("collapsed")
+              ? ""
+              : `<i class="bi bi-trash delete-session" onclick="deleteChatSession(${item.index}); event.stopPropagation();"></i>`;
+            sessionItem.innerHTML = `<img src="https://dummyimage.com/20x20/cccccc/000000.png&text=C" alt="Chat Icon" class="chat-session-icon">
+              <span>Chat ${item.index+1} – ${new Date(item.session[0].timestamp).toLocaleDateString("de-DE")}</span>${trashIcon}`;
+            container.appendChild(sessionItem);
+          });
+        }
+      });
+    }
+    function deleteChatSession(index) {
+      chatSessions.splice(index, 1);
+      localStorage.setItem("chatSessions", JSON.stringify(chatSessions));
+      renderChatSessionsSidebar();
+    }
+
+    /* =====================================
+       STREAMING & BOT-NACHRICHTEN
+    ===================================== */
+    async function sendMessage() {
+      const input = document.getElementById("userInput");
+      const text = input.value.trim();
+      if (!text) return;
+      addMessage("user-message", text);
+      input.value = "";
+      try {
+        showTypingIndicator();
+        const model = getSelectedModel();
+        const response = await fetch("http://127.0.0.1:11434/api/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: model, prompt: text, stream: true })
+        });
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.body) throw new Error("No response body");
+        const reader = response.body.getReader();
+        let responseText = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = new TextDecoder("utf-8").decode(value);
+          const lines = chunk.split('\n').filter(line => line.trim());
+          for (const line of lines) {
+            try {
+              const { response: token } = JSON.parse(line);
+              responseText += token;
+              updateBotMessage(responseText);
+            } catch (err) {
+              console.error("Error parsing JSON:", err);
+            }
+          }
+        }
+        finalizeBotMessage(responseText);
+      } catch (err) {
+        console.error("Send error:", err);
+        addMessage("bot-message", "Fehler: " + err.message);
+      } finally {
+        removeTypingIndicator();
       }
     }
-    
-    function toggleDarkMode() {
-      document.body.classList.toggle("dark-mode");
-      localStorage.setItem("darkMode", document.body.classList.contains("dark-mode") ? "enabled" : "disabled");
-    }
-    
     function showTypingIndicator() {
-      let chatHistoryDiv = document.getElementById("chatHistory");
-      removeTypingIndicator();
-      let wrapper = document.createElement("div");
+      const chatHistory = document.getElementById("chatHistory");
+      const wrapper = document.createElement("div");
       wrapper.classList.add("message-wrapper", "bot-message");
       wrapper.id = "typingIndicator";
-      
-      let avatar = document.createElement("img");
+      const avatar = document.createElement("img");
       avatar.src = "https://dummyimage.com/40x40/cccccc/000000.png&text=B";
       avatar.alt = "Bot Avatar";
       avatar.classList.add("message-avatar");
       wrapper.appendChild(avatar);
-      
-      let content = document.createElement("div");
+      const content = document.createElement("div");
       content.classList.add("message-content");
-      content.innerHTML = `<div class="spinner-border spinner-border-sm me-2" role="status">
-                             <span class="visually-hidden">Laden...</span>
-                           </div>KI schreibt...`;
+      content.innerHTML = `
+        <div class="spinner-border spinner-border-sm me-2" role="status">
+          <span class="visually-hidden">Laden...</span>
+        </div>KI schreibt...
+      `;
       wrapper.appendChild(content);
-      
-      chatHistoryDiv.appendChild(wrapper);
-      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
+      document.getElementById("chatHistory").appendChild(wrapper);
+      document.getElementById("chatHistory").scrollTop = document.getElementById("chatHistory").scrollHeight;
     }
-    
     function removeTypingIndicator() {
-      let typingIndicator = document.getElementById("typingIndicator");
-      if (typingIndicator) {
-        typingIndicator.remove();
+      const typing = document.getElementById("typingIndicator");
+      if (typing) typing.remove();
+    }
+    // Update der Bot-Nachricht: Extrahiere gegebenenfalls "Gedankengänge" und füge sie in einen separaten, togglebaren Block ein
+    function updateBotMessage(text) {
+      let extracted = extractChainOfThought(text);
+      text = extracted.mainText;
+      let chain = extracted.chainText;
+      let message = document.getElementById(currentBotMessageId);
+      if (!message) {
+        currentBotMessageId = "bot-" + Date.now();
+        addMessage("bot-message", text, currentBotMessageId);
+        message = document.getElementById(currentBotMessageId);
+        if (chain) {
+          appendChainToMessage(message, chain);
+        }
+        return;
+      }
+      const content = message.querySelector(".message-content");
+      if (content) {
+        // Setze den Haupttext (ohne Animation)
+        let botTextEl = content.querySelector(".bot-text");
+        if (!botTextEl) {
+          botTextEl = document.createElement("span");
+          botTextEl.classList.add("bot-text");
+          content.appendChild(botTextEl);
+        }
+        botTextEl.textContent = text;
+        if (chain) {
+          appendChainToMessage(message, chain);
+        }
+        if (currentChatSession.length > 0 && currentChatSession[currentChatSession.length-1].role === "bot-message") {
+          currentChatSession[currentChatSession.length-1].text = text;
+          saveCurrentChatSession();
+        }
       }
     }
-    
-    function showError(message) {
-      let errorDisplay = document.getElementById("errorDisplay");
-      errorDisplay.innerText = message;
-      errorDisplay.classList.remove("d-none");
-      setTimeout(() => {
-        errorDisplay.classList.add("d-none");
-      }, 5000);
-    }
-    
-    async function processStream(reader) {
-      const decoder = new TextDecoder();
-      let fullResponse = "";
-      try {
-        while (true) {
-          const { value, done } = await reader.read();
-          if (done) break;
-          const chunk = decoder.decode(value, { stream: true });
-          let jsonLines = chunk.trim().split("\n");
-          for (let line of jsonLines) {
-            if (line.trim() === "") continue;
-            try {
-              let json = JSON.parse(line);
-              if (json.response) {
-                fullResponse += json.response;
-              }
-            } catch (parseError) {
-              console.error("Fehler beim Parsen von JSON:", parseError, "Zeile:", line);
-            }
+    function finalizeBotMessage(text) {
+      let extracted = extractChainOfThought(text);
+      text = extracted.mainText;
+      let chain = extracted.chainText;
+      if (currentBotMessageId) {
+        let message = document.getElementById(currentBotMessageId);
+        if (message) {
+          const timeEl = document.createElement("div");
+          timeEl.classList.add("timestamp");
+          timeEl.textContent = formatMessageTimestamp(new Date());
+          message.querySelector(".message-content").appendChild(timeEl);
+          if (chain) {
+            appendChainToMessage(message, chain);
+          }
+          if (currentChatSession.length > 0 && currentChatSession[currentChatSession.length-1].role === "bot-message") {
+            currentChatSession[currentChatSession.length-1].text = text;
+            currentChatSession[currentChatSession.length-1].timestamp = new Date().toISOString();
+            saveCurrentChatSession();
           }
         }
-      } catch (streamError) {
-        console.error("Fehler beim Verarbeiten des Streams:", streamError);
-        throw streamError;
+        currentBotMessageId = null;
+      } else {
+        addMessage("bot-message", text);
       }
-      return fullResponse;
     }
-    
-    function formatTimestamp() {
-      const now = new Date();
-      return now.getHours().toString().padStart(2, '0') + ":" + now.getMinutes().toString().padStart(2, '0');
+
+    /* =====================================
+       VOICE, THEME & MODAL
+    ===================================== */
+    function toggleVoiceRecognition() {
+      if (!recognition) {
+        alert("Speech Recognition wird in diesem Browser nicht unterstützt.");
+        return;
+      }
+      const micIcon = document.getElementById("micIcon");
+      if (!isRecording) {
+        isRecording = true;
+        if (micIcon) micIcon.style.color = "red";
+        recognition.start();
+      } else {
+        isRecording = false;
+        if (micIcon) micIcon.style.color = "";
+        recognition.stop();
+      }
     }
-    
-    // Übersetzungsfunktionen werden genutzt, falls die Option aktiviert ist.
-    async function translateToEnglish(text) {
-      const response = await fetch("https://libretranslate.de/translate", {
-        method: "POST",
-        body: JSON.stringify({
-          q: text,
-          source: "de",
-          target: "en",
-          format: "text"
-        }),
-        headers: { "Content-Type": "application/json" }
+    function toggleTheme() {
+      document.body.classList.toggle("light-mode");
+      const isLight = document.body.classList.contains("light-mode");
+      localStorage.setItem("theme", isLight ? "light" : "dark");
+    }
+    function openSettings() {
+      const modal = new bootstrap.Modal(document.getElementById("settingsModal"));
+      modal.show();
+    }
+
+    /* =====================================
+       SIDEBAR COLLAPSE (EINKLAPPEN)
+    ===================================== */
+    function toggleSidebar() {
+      const sidebar = document.getElementById("sidebar");
+      sidebar.classList.toggle("collapsed");
+      document.querySelectorAll(".menu-item span, .chat-session-item span").forEach(el => {
+        el.style.display = sidebar.classList.contains("collapsed") ? "none" : "inline";
       });
-      const data = await response.json();
-      return data.translatedText;
-    }
-    
-    async function translateToGerman(text) {
-      const response = await fetch("https://libretranslate.de/translate", {
-        method: "POST",
-        body: JSON.stringify({
-          q: text,
-          source: "en",
-          target: "de",
-          format: "text"
-        }),
-        headers: { "Content-Type": "application/json" }
+      document.querySelectorAll(".chat-session-item .delete-session").forEach(el => {
+        el.style.display = sidebar.classList.contains("collapsed") ? "none" : "inline";
       });
-      const data = await response.json();
-      return data.translatedText;
+      const icon = document.getElementById("sidebarToggleIcon");
+      if (icon) {
+        icon.className = sidebar.classList.contains("collapsed") ? "bi bi-chevron-right" : "bi bi-chevron-left";
+      }
     }
-    
-    // sendMessage: Übersetzt den Input ins Englische, falls gewünscht, und übersetzt die Antwort zurück ins Deutsche.
-    async function sendMessage() {
-      const inputElement = document.getElementById("userInput");
-      const input = inputElement.value.trim();
-      if (!input) return;
-    
-      addMessage("user-message", input);
-      inputElement.value = "";
-      showTypingIndicator();
-    
-      let prompt = input;
-      const englishAnswer = localStorage.getItem("englishAnswer") === "true";
-      if (englishAnswer) {
-        try {
-          const translatedInput = await translateToEnglish(input);
-          prompt = "Please answer in English. " + translatedInput;
-        } catch (err) {
-          console.error("Fehler beim Übersetzen ins Englische:", err);
+    window.toggleSidebar = toggleSidebar;
+
+    /* =====================================
+       INITIALISIERUNG
+    ===================================== */
+    document.addEventListener("DOMContentLoaded", () => {
+      if (localStorage.getItem("theme") === "light") {
+        document.body.classList.add("light-mode");
+      }
+      loadCurrentChatSession();
+      renderCurrentChatSession();
+      renderChatSessionsSidebar();
+      openHome();
+      const input = document.getElementById("userInput");
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
         }
-      }
-      if (localStorage.getItem("contextEnabled") === "true") {
-        let messages = JSON.parse(localStorage.getItem("chatHistory")) || [];
-        let contextMessages = messages.slice(-4).map(msg => {
-          let role = msg.role === "user-message" ? "User" : "Bot";
-          return role + ": " + msg.text;
-        }).join("\n");
-        prompt = contextMessages + "\nUser: " + input;
-      }
-    
-      try {
-        const response = await fetch("http://127.0.0.1:11434/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "deepseek-r1", prompt: prompt, stream: true })
-        });
-    
-        if (!response.body) {
-          throw new Error("Keine Antwort erhalten.");
-        }
-    
-        const reader = response.body.getReader();
-        let fullResponse = await processStream(reader);
-        removeTypingIndicator();
-        fullResponse = fullResponse.replace(/<think>.*?<\/think>/gs, "").trim();
-        if (englishAnswer) {
-          try {
-            fullResponse = await translateToGerman(fullResponse);
-          } catch (err) {
-            console.error("Fehler beim Übersetzen ins Deutsche:", err);
-          }
-        }
-        addMessage("bot-message", fullResponse);
-      } catch (error) {
-        removeTypingIndicator();
-        console.error("Fetch-Fehler:", error);
-        showError("Fehler: Antwort konnte nicht abgerufen werden. Bitte überprüfen Sie Ihre Verbindung.");
-        addMessage("bot-message", "Fehler: Antwort konnte nicht abgerufen werden.");
-      }
-    }
-    
-    // Fügt eine Nachricht hinzu (wird mittels Markdown & MathJax verarbeitet) und persistiert sie.
-    function addMessage(className, text) {
-      const chatHistoryDiv = document.getElementById("chatHistory");
-      
-      let wrapper = document.createElement("div");
-      wrapper.classList.add("message-wrapper", className);
-      
-      let avatar = document.createElement("img");
-      avatar.src = className === "user-message" 
-                 ? "https://dummyimage.com/40x40/cccccc/000000.png&text=U" 
-                 : "https://dummyimage.com/40x40/cccccc/000000.png&text=B";
-      avatar.alt = className === "user-message" ? "User Avatar" : "Bot Avatar";
-      avatar.classList.add("message-avatar");
-      wrapper.appendChild(avatar);
-      
-      let content = document.createElement("div");
-      content.classList.add("message-content");
-      let processedText = transformMath(text);
-      content.innerHTML = marked.parse(processedText);
-      
-      let timeStamp = document.createElement("div");
-      timeStamp.classList.add("timestamp");
-      timeStamp.innerText = formatTimestamp();
-      content.appendChild(timeStamp);
-      
-      wrapper.appendChild(content);
-      chatHistoryDiv.appendChild(wrapper);
-      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
-      
-      persistMessage({ role: className, text: text, timestamp: timeStamp.innerText });
-      
-      if (window.MathJax) {
-        MathJax.typesetPromise();
-      }
-    }
-    
-    function persistMessage(message) {
-      let messages = JSON.parse(localStorage.getItem("chatHistory")) || [];
-      messages.push(message);
-      localStorage.setItem("chatHistory", JSON.stringify(messages));
-    }
-    
-    function loadChatHistory() {
-      let messages = JSON.parse(localStorage.getItem("chatHistory")) || [];
-      const chatHistoryDiv = document.getElementById("chatHistory");
-      messages.forEach(msg => {
-        let wrapper = document.createElement("div");
-        wrapper.classList.add("message-wrapper", msg.role);
-        
-        let avatar = document.createElement("img");
-        avatar.src = msg.role === "user-message" 
-                 ? "https://dummyimage.com/40x40/cccccc/000000.png&text=U" 
-                 : "https://dummyimage.com/40x40/cccccc/000000.png&text=B";
-        avatar.alt = msg.role === "user-message" ? "User Avatar" : "Bot Avatar";
-        avatar.classList.add("message-avatar");
-        wrapper.appendChild(avatar);
-        
-        let content = document.createElement("div");
-        content.classList.add("message-content");
-        let processedText = transformMath(msg.text);
-        content.innerHTML = marked.parse(processedText);
-        
-        let timeStamp = document.createElement("div");
-        timeStamp.classList.add("timestamp");
-        timeStamp.innerText = msg.timestamp || "";
-        content.appendChild(timeStamp);
-        wrapper.appendChild(content);
-        
-        chatHistoryDiv.appendChild(wrapper);
       });
-      chatHistoryDiv.scrollTop = chatHistoryDiv.scrollHeight;
-      
-      if (window.MathJax) {
-        MathJax.typesetPromise();
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = "de-DE";
+        recognition.interimResults = false;
+        recognition.maxAlternatives = 1;
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript;
+          document.getElementById("userInput").value = transcript;
+          toggleVoiceRecognition();
+        };
+        recognition.onerror = (event) => {
+          console.error("Speech Recognition Error: ", event.error);
+          toggleVoiceRecognition();
+        };
+        recognition.onend = () => {
+          isRecording = false;
+          const micIcon = document.getElementById("micIcon");
+          if (micIcon) micIcon.style.color = "";
+        };
       }
-    }
-    
-    function clearChat() {
-      if (confirm("Möchten Sie den Chatverlauf wirklich löschen?")) {
-        document.getElementById("chatHistory").innerHTML = "";
-        localStorage.removeItem("chatHistory");
-      }
-    }
-    
-    function confirmClearChat() {
-      if (confirm("Möchten Sie den Chatverlauf wirklich löschen?")) {
-        clearChat();
-      }
-    }
+    });
   </script>
+  <!-- Keine zusätzlichen Animationen -->
 </body>
 </html>
